@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "FlipKit Pro"
+version = "1.0.0"
+id = "artifacts/flipkit-pro"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22096
+
+[services.development]
+run = "pnpm --filter @workspace/flipkit-pro run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/flipkit-pro", "run", "build" ]
+publicDir = "artifacts/flipkit-pro/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22096"
+BASE_PATH = "/"
