@@ -1,15 +1,27 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Download, Wand2, Check, Package, Truck, Tag, Star } from "lucide-react";
+import { Copy, Download, Wand2, Check, Package, Truck, Tag, Star, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { generateListing } from "@/lib/generators";
+import { generateListing, type GeneratedListing } from "@/lib/generators";
 import { exportToCSV } from "@/lib/csvExport";
+import { enhanceListingWithAi, isAiConfigured, AiError } from "@/lib/aiEnhance";
+
+const CONDITIONS = [
+  "New",
+  "New Other",
+  "Certified Refurbished",
+  "Seller Refurbished",
+  "Used",
+  "For Parts or Not Working",
+];
 
 function bumpStatsListings() {
   const prev = Number(localStorage.getItem("flipkit-stats-listings") || 0);
@@ -47,7 +59,10 @@ function CharCount({ value, max = 80 }: { value: string; max?: number }) {
 export default function ListingGenerator() {
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
-  const [results, setResults] = useState<ReturnType<typeof generateListing> | null>(null);
+  const [condition, setCondition] = useState("Used");
+  const [results, setResults] = useState<GeneratedListing | null>(null);
+  const [aiEnhanced, setAiEnhanced] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
@@ -57,9 +72,45 @@ export default function ListingGenerator() {
       toast({ title: "Error", description: "Product name is required", variant: "destructive" });
       return;
     }
-    const generated = generateListing(productName, description);
+    const generated = generateListing(productName, description, condition);
     setResults(generated);
+    setAiEnhanced(false);
     bumpStatsListings();
+  };
+
+  const handleEnhanceWithAi = async () => {
+    if (!results) return;
+    if (!isAiConfigured()) {
+      toast({
+        title: "AI not set up yet",
+        description: "Add your free Google Gemini API key in AI Settings (bottom of the sidebar). Your key never leaves this browser except to call Google.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEnhancing(true);
+    try {
+      const ai = await enhanceListingWithAi({
+        productName,
+        notes: description,
+        condition,
+        draftTitle: results.optimizedTitle,
+        draftBullets: results.bulletPoints,
+      });
+      setResults({
+        ...results,
+        optimizedTitle: ai.title,
+        bulletPoints: ai.bulletPoints,
+        specifics: { ...results.specifics, ...ai.specifics },
+      });
+      setAiEnhanced(true);
+      toast({ title: "Enhanced with AI", description: "Review the draft before posting — AI can still get details wrong." });
+    } catch (err) {
+      const message = err instanceof AiError ? err.message : "AI enhancement failed. Your draft is unchanged.";
+      toast({ title: "AI enhancement failed", description: message, variant: "destructive" });
+    } finally {
+      setEnhancing(false);
+    }
   };
 
   const handleCopy = (text: string, section: string) => {
@@ -77,8 +128,7 @@ export default function ListingGenerator() {
         .map(([k, v]) => `${k}: ${v}`)
         .join("\n")}`,
       `\nDESCRIPTION:\n${results.bulletPoints.map((b) => `• ${b}`).join("\n")}`,
-      `\nPRICE RANGE: $${results.priceRange.low} – $${results.priceRange.high} (recommended: $${results.priceRange.mid})`,
-      `\nCATEGORIES:\n${results.categories.map((c) => `#${c.id} ${c.name}`).join("\n")}`,
+      `\nCATEGORY SUGGESTIONS:\n${results.categorySuggestions.join("\n")}`,
     ].join("\n");
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -91,14 +141,11 @@ export default function ListingGenerator() {
     const row = {
       Title: results.optimizedTitle,
       Brand: results.specifics.Brand,
-      Model: results.specifics.Model,
       Condition: results.specifics.Condition,
       MPN: results.specifics.MPN,
       UPC: results.specifics.UPC,
       Description: results.bulletPoints.join(" | "),
-      PriceLow: results.priceRange.low,
-      PriceMid: results.priceRange.mid,
-      PriceHigh: results.priceRange.high,
+      CategorySuggestion: results.categorySuggestions[0] ?? "",
     };
     exportToCSV("listing-generation", [row]);
     toast({ title: "Exported", description: "Listing exported to CSV." });
@@ -123,10 +170,7 @@ export default function ListingGenerator() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="productName">Product Name / Keywords</Label>
-              <motion.div
-                whileFocusWithin={{ scale: 1.01 }}
-                transition={{ duration: 0.15 }}
-              >
+              <div className="transition-transform duration-150 focus-within:scale-[1.01]">
                 <Input
                   id="productName"
                   placeholder="e.g. Sony Walkman WM-FX281"
@@ -135,14 +179,11 @@ export default function ListingGenerator() {
                   className="transition-all focus:ring-2 focus:ring-primary/40"
                   data-testid="input-product-name"
                 />
-              </motion.div>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">Raw Notes (Optional)</Label>
-              <motion.div
-                whileFocusWithin={{ scale: 1.005 }}
-                transition={{ duration: 0.15 }}
-              >
+              <div className="transition-transform duration-150 focus-within:scale-[1.005]">
                 <Textarea
                   id="description"
                   placeholder="e.g. Tested works great, small scratch on back, no headphones"
@@ -151,7 +192,22 @@ export default function ListingGenerator() {
                   onChange={(e) => setDescription(e.target.value)}
                   data-testid="input-description"
                 />
-              </motion.div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Condition</Label>
+              <Select value={condition} onValueChange={setCondition}>
+                <SelectTrigger data-testid="select-condition">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CONDITIONS.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
               <Button
@@ -178,7 +234,23 @@ export default function ListingGenerator() {
               className="space-y-3"
             >
               {/* Action buttons */}
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-2 justify-end flex-wrap">
+                <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleEnhanceWithAi}
+                    disabled={enhancing}
+                    data-testid="button-ai-enhance"
+                  >
+                    {enhancing ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    {aiEnhanced ? "Enhance Again" : "Enhance with AI"}
+                  </Button>
+                </motion.div>
                 <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
                   <Button
                     variant="outline"
@@ -249,22 +321,23 @@ export default function ListingGenerator() {
                     <CharCount value={results.optimizedTitle} />
                   </div>
 
-                  {/* Price + Condition row */}
+                  {/* Condition + pricing note (FlipKit has no market data, so it
+                      never invents a price — pricing is the seller's call) */}
                   <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-2xl font-extrabold text-green-500">
-                        ${results.priceRange.mid}
-                      </span>
-                      <span className="text-sm text-muted-foreground line-through">
-                        ${results.priceRange.high}
-                      </span>
-                    </div>
                     <Badge className="bg-primary/15 text-primary border-primary/30 text-xs">
                       {results.specifics.Condition}
                     </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      Price Range: ${results.priceRange.low} – ${results.priceRange.high}
-                    </Badge>
+                    {aiEnhanced && (
+                      <Badge className="bg-fuchsia-500/15 text-fuchsia-400 border-fuchsia-500/30 text-xs">
+                        AI-enhanced draft — review before posting
+                      </Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      No price suggested — FlipKit has no live market data.{" "}
+                      <Link href="/pricing" className="underline text-primary">
+                        Price it with the Pricing Calculator
+                      </Link>
+                    </span>
                   </div>
 
                   {/* Divider */}
@@ -370,15 +443,15 @@ export default function ListingGenerator() {
                   {/* Divider */}
                   <div className="border-t border-border/60" />
 
-                  {/* Categories */}
+                  {/* Category suggestions */}
                   <div className="space-y-2">
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Suggested Categories
+                      Category Suggestions
                     </span>
                     <div className="flex flex-wrap gap-2">
-                      {results.categories.map((c, i) => (
+                      {results.categorySuggestions.map((c, i) => (
                         <Badge key={i} variant="secondary" className="text-xs">
-                          #{c.id} · {c.name}
+                          {c}
                         </Badge>
                       ))}
                     </div>

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { exportToCSV } from "@/lib/csvExport";
+import { computeSaleProfit } from "@/lib/pricing";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 type Sale = {
@@ -27,10 +28,21 @@ type Sale = {
 
 const CATEGORIES = ["Electronics", "Clothing", "Collectibles", "Books", "Tools", "Other"];
 
+/** Form state is strings (raw input values); converted to numbers on save. */
+type SaleForm = {
+  name: string;
+  category: string;
+  buyPrice: string;
+  sellPrice: string;
+  shippingCost: string;
+};
+
+const EMPTY_FORM: SaleForm = { name: "", category: "Electronics", buyPrice: "", sellPrice: "", shippingCost: "" };
+
 export default function ProfitTracker() {
   const [sales, setSales] = useLocalStorage<Sale[]>("flipkit-sales", []);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newSale, setNewSale] = useState<Partial<Sale>>({ category: "Electronics" });
+  const [newSale, setNewSale] = useState<SaleForm>(EMPTY_FORM);
   const { toast } = useToast();
 
   const handleSave = () => {
@@ -42,9 +54,8 @@ export default function ProfitTracker() {
     const buyPrice = Number(newSale.buyPrice) || 0;
     const sellPrice = Number(newSale.sellPrice);
     const shippingCost = Number(newSale.shippingCost) || 0;
-    // Auto calculate eBay fees roughly: 12.9% + 0.30
-    const fees = (sellPrice * 0.129) + 0.30;
-    const profit = sellPrice - buyPrice - shippingCost - fees;
+    // Fee math lives in @/lib/pricing (eBay 12.9% + $0.30 default model).
+    const { fees, profit } = computeSaleProfit({ sellPrice, buyPrice, shippingCost });
 
     const sale: Sale = {
       id: Date.now().toString(),
@@ -60,7 +71,7 @@ export default function ProfitTracker() {
 
     setSales([sale, ...sales]);
     setIsDialogOpen(false);
-    setNewSale({ category: "Electronics" });
+    setNewSale(EMPTY_FORM);
     toast({ title: "Sale Logged", description: "Successfully tracked sale." });
   };
 

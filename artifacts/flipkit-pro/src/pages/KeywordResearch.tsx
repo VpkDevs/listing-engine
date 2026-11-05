@@ -21,7 +21,7 @@ export default function KeywordResearch() {
     }
     const results = generateKeywords(category);
     setKeywords(results.sort((a, b) => {
-      const tierVal = { "High": 3, "Medium": 2, "Low": 1 };
+      const tierVal = { "Core": 3, "Supporting": 2, "Long-tail": 1 };
       return tierVal[b.tier as keyof typeof tierVal] - tierVal[a.tier as keyof typeof tierVal];
     }));
   };
@@ -43,7 +43,10 @@ export default function KeywordResearch() {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Keyword Research</h1>
-        <p className="text-muted-foreground mt-2">Generate high-volume search terms for your listings.</p>
+        <p className="text-muted-foreground mt-2">
+          Build a starter keyword list for a product type. Tiers mark how central a phrase is —
+          not search volume (FlipKit has no volume data, so refine against eBay sold listings).
+        </p>
       </div>
 
       <div className="flex gap-3">
@@ -93,7 +96,7 @@ export default function KeywordResearch() {
                   >
                     {kw.word}
                     <span className="ml-2 text-xs opacity-70">
-                      {kw.tier === 'High' ? '🔥' : kw.tier === 'Medium' ? '⚡' : '📊'}
+                      {kw.tier === 'Core' ? '🔥' : kw.tier === 'Supporting' ? '⚡' : '📊'}
                     </span>
                   </Badge>
                 ))}
@@ -102,9 +105,9 @@ export default function KeywordResearch() {
           </Card>
           
           <div className="flex gap-4 text-xs text-muted-foreground mt-2">
-            <span className="flex items-center gap-1">🔥 High Volume</span>
-            <span className="flex items-center gap-1">⚡ Medium Volume</span>
-            <span className="flex items-center gap-1">📊 Low/Niche Volume</span>
+            <span className="flex items-center gap-1">🔥 Core phrase</span>
+            <span className="flex items-center gap-1">⚡ Supporting modifier</span>
+            <span className="flex items-center gap-1">📊 Long-tail phrase</span>
           </div>
         </motion.div>
       )}

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { computeRecommendedPrice } from "@/lib/pricing";
 
 export default function PricingCalculator() {
   const [buyPrice, setBuyPrice] = useState(10);
@@ -12,32 +13,22 @@ export default function PricingCalculator() {
   const [paymentFeePct, setPaymentFeePct] = useState(2.9);
   const [targetMargin, setTargetMargin] = useState(30);
 
-  // Math
-  // Target Profit = SellPrice * (Margin / 100)
-  // SellPrice = BuyPrice + Shipping + (SellPrice * eBayFeePct) + eBayFlatFee + (SellPrice * PaymentFeePct) + TargetProfit
-  // SellPrice - (SellPrice * eBayFeePct) - (SellPrice * PaymentFeePct) - (SellPrice * Margin) = BuyPrice + Shipping + eBayFlatFee
-  // SellPrice * (1 - eBayFeePct - PaymentFeePct - Margin) = BuyPrice + Shipping + eBayFlatFee
-  // SellPrice = (BuyPrice + Shipping + eBayFlatFee) / (1 - eBayFeePct - PaymentFeePct - Margin)
-  
-  const combinedFeePct = (ebayFeePct / 100) + (paymentFeePct / 100);
-  const marginDec = targetMargin / 100;
-  
-  let recPrice = 0;
-  let profit = 0;
-  let totalFees = 0;
-  let ebayFeeDollars = 0;
-  let paymentFeeDollars = 0;
-
-  if (1 - combinedFeePct - marginDec > 0) {
-    recPrice = (buyPrice + shippingCost + ebayFlatFee) / (1 - combinedFeePct - marginDec);
-    ebayFeeDollars = (recPrice * (ebayFeePct / 100)) + ebayFlatFee;
-    paymentFeeDollars = recPrice * (paymentFeePct / 100);
-    totalFees = ebayFeeDollars + paymentFeeDollars;
-    profit = recPrice - buyPrice - shippingCost - totalFees;
-  }
-
-  const isInvalid = 1 - combinedFeePct - marginDec <= 0;
-  const roi = buyPrice > 0 ? (profit / buyPrice) * 100 : 0;
+  // Math lives in @/lib/pricing (unit-tested) — this page only renders it.
+  const result = computeRecommendedPrice({
+    buyPrice,
+    shippingCost,
+    ebayFeePct,
+    ebayFlatFee,
+    paymentFeePct,
+    targetMarginPct: targetMargin,
+  });
+  const recPrice = result.recommendedPrice;
+  const profit = result.profit;
+  const totalFees = result.totalFees;
+  const ebayFeeDollars = result.ebayFeeDollars;
+  const paymentFeeDollars = result.paymentFeeDollars;
+  const isInvalid = !result.valid;
+  const roi = result.roi;
 
   const handleNum = (val: string, setter: (n: number) => void) => {
     const parsed = parseFloat(val);

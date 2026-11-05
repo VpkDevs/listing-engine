@@ -14,9 +14,22 @@ import {
   TrendingUp,
   Zap,
   DollarSign,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { getGeminiKey, setGeminiKey } from "@/lib/aiEnhance";
 
 const NAV_ITEMS = [
   { href: "/", label: "Listing Generator", icon: Wand2, shortcut: "G" },
@@ -27,6 +40,87 @@ const NAV_ITEMS = [
   { href: "/tracker", label: "Profit Tracker", icon: LineChart },
   { href: "/condition", label: "Condition Helper", icon: ClipboardList },
 ];
+
+function AiSettingsButton() {
+  const [open, setOpen] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [hasKey, setHasKey] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setHasKey(getGeminiKey() !== null);
+      setKeyInput("");
+    }
+  }, [open ]);
+
+  const handleSave = () => {
+    setGeminiKey(keyInput);
+    setHasKey(getGeminiKey() !== null);
+    setKeyInput("");
+  };
+
+  const handleClear = () => {
+    setGeminiKey("");
+    setHasKey(false);
+    setKeyInput("");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          className="w-full flex items-center justify-between px-3 py-2 rounded-md text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+          data-testid="button-ai-settings"
+        >
+          <span>AI Settings</span>
+          <Sparkles className="w-4 h-4" />
+        </button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>AI Settings — bring your own key</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            The "Enhance with AI" button in the Listing Generator uses your own free
+            Google Gemini API key. The key is stored only in this browser and is sent
+            only to Google when you click Enhance. FlipKit never sees or stores it on
+            any server. Without a key, every tool keeps working with the built-in
+            deterministic drafts.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Get a free key from Google AI Studio (aistudio.google.com/apikey), then
+            paste it here.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="gemini-key">Gemini API Key</Label>
+            <Input
+              id="gemini-key"
+              type="password"
+              placeholder={hasKey ? "A key is saved — paste to replace it" : "AIza…"}
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              data-testid="input-gemini-key"
+            />
+            <p className="text-xs text-muted-foreground">
+              Status: {hasKey ? "Key saved in this browser ✓" : "No key saved"}
+            </p>
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          {hasKey && (
+            <Button variant="outline" onClick={handleClear}>
+              Remove Key
+            </Button>
+          )}
+          <Button onClick={handleSave} disabled={!keyInput.trim()}>
+            Save Key
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function getStats() {
   try {
@@ -128,8 +222,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Footer: theme toggle + version */}
+        {/* Footer: AI settings, theme toggle, version */}
         <div className="p-3 border-t border-sidebar-border space-y-2">
+          <AiSettingsButton />
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.96 }}
