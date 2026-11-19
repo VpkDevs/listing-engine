@@ -6,6 +6,15 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+app.disable("x-powered-by");
+
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
 app.use(
   pinoHttp({
     logger,
@@ -28,6 +37,10 @@ app.use(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
 
 app.use("/api", router);
 

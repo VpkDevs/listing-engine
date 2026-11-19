@@ -44,14 +44,19 @@ in the sidebar.
 ## Running it
 
 ```bash
-pnpm install
-pnpm --filter @workspace/flipkit-pro run dev   # dev server
-pnpm run build                                  # typecheck + production build
-pnpm run test                                   # unit tests (vitest)
+pnpm install --frozen-lockfile
+pnpm run dev        # FlipKit Pro dev server (http://localhost:5173)
+pnpm run build      # typecheck + production build (all packages)
+pnpm run build:web  # typecheck + production build (FlipKit Pro web app only)
+pnpm run preview    # preview production bundle locally
+pnpm run test       # unit tests (vitest)
 ```
 
-The app builds and runs outside Replit too — `PORT` and `BASE_PATH` fall
-back to `5173` and `/` when unset.
+The app builds and runs outside Replit with zero environment variables required — `PORT` and `BASE_PATH` fall back to `5173` and `/` when unset, and Replit dev plugins only load inside Replit (`REPL_ID` set in dev).
+
+## Deploying
+
+FlipKit Pro is deployment-ready for **Vercel** (`vercel.json`), **Netlify** (`netlify.toml`), and **Docker** (`Dockerfile` + nginx). See [**DEPLOYMENT.md**](./DEPLOYMENT.md) for step-by-step deploy commands, security headers, environment variable notes, and honest readiness status.
 
 ## Honest status / known gaps
 
